@@ -4,6 +4,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;
+import android.media.AudioTrack;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -20,10 +21,12 @@ import com.example.ffmpegr4.view.MySurfaceView;
 public class SurfaceViewActivity extends AppCompatActivity {
     private static final int ON_CHOOSE_VIDEOS = 10;
     MySurfaceView surfaceView;
-    TextView textView;
+    TextView title;
+    TextView text_duration;
     Button button;
     Button btnChoose;
     String filePath;
+
     static {
         System.loadLibrary("native-lib");
         System.loadLibrary("avutil");
@@ -37,18 +40,18 @@ public class SurfaceViewActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_surface_view);
-
+        String filepath = "/sdcard/douyin2.mp4";
         surfaceView = findViewById(R.id.surface_view);
-        textView = findViewById(R.id.text_title);
+        title = findViewById(R.id.text_title);
+        text_duration = findViewById(R.id.text_duration);
         button = findViewById(R.id.btn_play);
         btnChoose = findViewById(R.id.btn_choose);
-        Uri uri = Uri.parse("android:resource://"+getResources().getResourcePackageName(R.raw.ig)+"/"+R.raw.ig);
-        Logger.D(Environment.getExternalStorageDirectory().toString());
-        Logger.D(Environment.getStorageDirectory().getAbsolutePath());
+       /* Logger.D(Environment.getExternalStorageDirectory().toString());
+        Logger.D(Environment.getStorageDirectory().getAbsolutePath());*/
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                playVideo("/sdcard/DCIM/Camera/VID_20190706_084618.mp4",surfaceView.getMyHolder().getSurface());
+                playVideo(filepath,surfaceView.getMyHolder().getSurface());
             }
         });
         btnChoose.setOnClickListener(new View.OnClickListener() {
@@ -60,6 +63,8 @@ public class SurfaceViewActivity extends AppCompatActivity {
                 startActivityForResult(intent,ON_CHOOSE_VIDEOS);
             }
         });
+        long time_duration = getVideoDurattion(filepath);
+        text_duration.setText(" "+time_duration/10e5+"s");
     }
 
     @Override
@@ -72,6 +77,7 @@ public class SurfaceViewActivity extends AppCompatActivity {
     }
 
     private native void playVideo(String path, Surface surface);
+    private native long getVideoDurattion(String path);
 
 
 }

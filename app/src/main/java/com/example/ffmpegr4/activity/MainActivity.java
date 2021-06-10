@@ -29,6 +29,7 @@ public class MainActivity extends AppCompatActivity {
     private Button button;
     private Button btn_VideoView;
     private Button btn_trans;
+    private Button btn_Audio;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -36,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
         checkPermssion();
         // Example of a call to a native method
         TextView tv = findViewById(R.id.sample_text);
-        tv.setText(stringFromFfmpeg());
+        //tv.setText(stringFromFfmpeg());
         button = findViewById(R.id.btn_Surface);
         button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -58,6 +59,13 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(MainActivity.this, TransActivity.class));
             }
         });
+        btn_Audio = findViewById(R.id.btn_music);
+        btn_Audio.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this,AudioActivity.class));
+            }
+        });
 
     }
     private void checkPermssion(){
@@ -69,6 +77,4 @@ public class MainActivity extends AppCompatActivity {
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    public native String stringFromJNI();
-    public native String stringFromFfmpeg();
 }

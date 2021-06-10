@@ -22,12 +22,11 @@
 
     <com.example.ffmpegr4.view.MySurfaceView
         android:id="@+id/surface_view"
-        android:layout_width="400dp"
-        android:layout_height="400dp"
-
-        android:layout_marginTop="60dp"
+        android:layout_width="360dp"
+        android:layout_height="360dp"
+        android:layout_marginTop="52dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="1.0"
+        app:layout_constraintHorizontal_bias="0.313"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -50,4 +49,13 @@
         android:text="play"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/surface_view" />
+
+    <TextView
+        android:id="@+id/text_duration"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="Duration： "
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btn_choose" />
 </androidx.constraintlayout.widget.ConstraintLayout>

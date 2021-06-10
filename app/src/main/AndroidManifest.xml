@@ -13,7 +13,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegr4">
-        <activity android:name=".activity.TransActivity"></activity>
+        <activity android:name=".activity.AudioActivity"></activity>
+        <activity android:name=".activity.TransActivity" />
         <activity android:name=".activity.VideoActivity" />
         <activity android:name=".activity.SurfaceViewActivity" />
         <activity android:name=".activity.MainActivity">

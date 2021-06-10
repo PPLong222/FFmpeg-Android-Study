@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
+#include <unistd.h>
 #include <stdio.h>
 #define LOG_TAG "ffmpegLog"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -15,8 +16,12 @@ extern "C"{
 #include "include/libavformat/avformat.h"
 #include "include/libavcodec/codec.h"
 #include "include/libavutil/log.h"
-#include "libswscale/swscale.h"
-#include "libavutil/imgutils.h"
+#include "include/libswscale/swscale.h"
+#include "include/libswresample/swresample.h"
+#include "include/libavutil/imgutils.h"
+#include <ctime>
+#include "include/libswscale/swscale.h"
+#include "include/libavutil/imgutils.h"
 JavaVM *javaVm;
 }
 static void log_callback_test2(void *ptr, int level, const char *fmt, va_list vl)
@@ -49,132 +54,8 @@ Java_com_example_ffmpegr4_MainActivity_stringFromFfmpeg(JNIEnv *env, jobject thi
     //std::string hello = "Hello from C++";
     //return env->NewStringUTF(hello.c_str());
     return env->NewStringUTF(av_version_info());
-}extern "C"
-JNIEXPORT void JNICALL
-Java_com_example_ffmpegr4_SurfaceViewActivity_playVideo(JNIEnv *env, jobject thiz, jstring path, jobject surface) {
-    av_log_set_callback(log_callback_test2);
-   AVFormatContext *pFormatCtx;
-   AVCodecContext *pCodecCtx;
-   AVPacket *pPacket;
-   AVCodec *pCodec;
-   AVFrame *pFrame,*rgbaFrame;
-   int ret ,video_index;
-   av_log_set_level(AV_LOG_INFO);
-   av_log(nullptr,AV_LOG_INFO,"LOG: begin!");
-   pFormatCtx = avformat_alloc_context();
-   const char *filepath = env->GetStringUTFChars(path,0);
-   av_log(nullptr,AV_LOG_INFO,"filepath: %s",filepath);
-   ret = avformat_open_input(&pFormatCtx, filepath,NULL, NULL);
-   if(ret < 0){
-       av_log(NULL,AV_LOG_ERROR,"can;t open input");
-       return ;
-   }
-   //av_dump_format(pFormatCtx,0,filepath,0);
-   av_log(NULL,AV_LOG_INFO,"video duration: %" PRId64,pFormatCtx->duration);
-   ret = avformat_find_stream_info(pFormatCtx,NULL);
-    if(ret < 0) {
-        av_log(NULL, AV_LOG_ERROR, "can;t find stream info");
-        return;
-    }
-    video_index = -1;
-    for(int i = 0;i<pFormatCtx->nb_streams; i++){
-        if(pFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
-            video_index = i;
-    }
-    if(video_index == -1){
-        av_log(NULL,AV_LOG_ERROR,"can;t find video stream");
-        return ;
-    }
-    pCodecCtx = avcodec_alloc_context3(NULL);
-    avcodec_parameters_to_context(pCodecCtx,pFormatCtx->streams[video_index]->codecpar);
-    pCodec = (AVCodec *)(avcodec_find_decoder(pCodecCtx->codec_id));
-    if(pCodec == NULL){
-        av_log(NULL,AV_LOG_ERROR,"can;t find decoder");
-        return ;
-    }
-    ret = avcodec_open2(pCodecCtx,pCodec,NULL);
-    if(ret <0){
-        av_log(NULL,AV_LOG_ERROR,"can;t open video decoder");
-        return ;
-    }
-    int vWidth = pCodecCtx->width;
-    int vHeight = pCodecCtx->height;
-    ANativeWindow *nativeWindow = ANativeWindow_fromSurface(env,surface);
-    if(nativeWindow == NULL){
-        av_log(NULL,AV_LOG_ERROR,"can;t create native window");
-        return ;
-    }
-    ret = ANativeWindow_setBuffersGeometry(nativeWindow,vWidth,vHeight,WINDOW_FORMAT_RGBA_8888);
-    if(ret <0){
-        av_log(NULL,AV_LOG_ERROR,"can;t set native window buffer");
-        return ;
-    }
-    ANativeWindow_Buffer windowBuffer;
-    pPacket = av_packet_alloc();
-    pFrame = av_frame_alloc();
-    rgbaFrame = av_frame_alloc();
-    int buffer_size = av_image_get_buffer_size(AV_PIX_FMT_RGBA,vWidth,vHeight,1);
-    uint8_t  *out_buffer = (uint8_t*) av_malloc(buffer_size*sizeof(uint8_t));
-    av_image_fill_arrays(rgbaFrame->data,rgbaFrame->linesize,out_buffer,AV_PIX_FMT_RGBA,vWidth,vHeight,1);
-
-    struct SwsContext *swsContext = sws_getContext(
-            vWidth,vHeight,pCodecCtx->pix_fmt,
-            vWidth,vHeight,AV_PIX_FMT_RGBA,
-            SWS_BICUBIC,NULL,NULL,NULL
-            );
-    while(av_read_frame(pFormatCtx,pPacket) >= 0){
-        if(pPacket->stream_index == video_index){
-            ret = avcodec_send_packet(pCodecCtx,pPacket);
-            if(ret<0 && ret != AVERROR(EAGAIN) &&ret != AVERROR_EOF){
-                av_log(NULL,AV_LOG_ERROR,"PLAYER ERROR");
-                return ;
-            }
-            ret = avcodec_receive_frame(pCodecCtx,pFrame);
-            if(ret<0 && ret != AVERROR_EOF){
-                av_log(NULL,AV_LOG_ERROR,"player error 2");
-                continue;
-            }
-            ret = sws_scale(swsContext,
-                            (const uint8_t* const*)pFrame->data,pFrame->linesize,
-                            0,vHeight,rgbaFrame->data,rgbaFrame->linesize);
-            if(ret<0){
-                av_log(NULL,AV_LOG_ERROR,"play error 3");
-                return ;
-            }
-            ret = ANativeWindow_lock(nativeWindow,&windowBuffer,NULL);
-            if(ret <0){
-                av_log(NULL,AV_LOG_ERROR,"player error 4");
-                return ;
-            }else{
-                uint8_t  *bit = (uint8_t *)windowBuffer.bits;
-                for(int h =0;h<vHeight;h++){
-                    memcpy(bit+h*windowBuffer.stride*4,
-                            out_buffer+h*rgbaFrame->linesize[0],
-                            rgbaFrame->linesize[0]);
-                }
-                ANativeWindow_unlockAndPost(nativeWindow);
-            }
-        }
-        av_packet_unref(pPacket);
-
-    }
-
-    sws_freeContext(swsContext);
-    av_free(out_buffer);
-    av_frame_free(&pFrame);
-    av_frame_free(&rgbaFrame);
-    av_packet_free(&pPacket);
-    ANativeWindow_release(nativeWindow);
-    avcodec_close(pCodecCtx);
-    avformat_close_input(&pFormatCtx);
-
-    env->ReleaseStringUTFChars(path,filepath);
-
-    return;
-
-
-
 }
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_ffmpegr4_activity_TransActivity_transVideo(JNIEnv *env, jobject thiz, jstring path,jstring output) {
@@ -251,3 +132,240 @@ Java_com_example_ffmpegr4_activity_TransActivity_transVideo(JNIEnv *env, jobject
     env->ReleaseStringUTFChars(path,filepath);
 
 }
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegr4_activity_SurfaceViewActivity_playVideo(JNIEnv *env, jobject thiz,
+                                                                 jstring path, jobject surface) {
+    av_log_set_callback(log_callback_test2);
+    AVFormatContext *pFormatCtx;
+    AVCodecContext *pCodecCtx;
+    AVPacket *pPacket;
+    AVCodec *pCodec;
+    AVFrame *pFrame,*yuvFrame;
+    int ret ,video_index;
+    av_log_set_level(AV_LOG_INFO);
+    av_log(nullptr,AV_LOG_INFO,"LOG: begin!");
+    pFormatCtx = avformat_alloc_context();
+    const char *filepath = env->GetStringUTFChars(path,0);
+    av_log(nullptr,AV_LOG_INFO,"filepath: %s",filepath);
+    ret = avformat_open_input(&pFormatCtx, filepath,NULL, NULL);
+    if(ret < 0){
+        av_log(NULL,AV_LOG_ERROR,"can;t open input");
+        return ;
+    }
+    //av_dump_format(pFormatCtx,0,filepath,0);
+    av_log(NULL,AV_LOG_INFO,"video duration: %" PRId64,pFormatCtx->duration);
+    ret = avformat_find_stream_info(pFormatCtx,NULL);
+    if(ret < 0) {
+        av_log(NULL, AV_LOG_ERROR, "can;t find stream info");
+        return;
+    }
+    video_index = -1;
+    for(int i = 0;i<pFormatCtx->nb_streams; i++){
+        if(pFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
+            video_index = i;
+    }
+    if(video_index == -1){
+        av_log(NULL,AV_LOG_ERROR,"can;t find video stream");
+        return ;
+    }
+    pCodecCtx = avcodec_alloc_context3(NULL);
+    avcodec_parameters_to_context(pCodecCtx,pFormatCtx->streams[video_index]->codecpar);
+    pCodec = (AVCodec *)(avcodec_find_decoder(pCodecCtx->codec_id));
+    if(pCodec == NULL){
+        av_log(NULL,AV_LOG_ERROR,"can;t find decoder");
+        return ;
+    }
+    ret = avcodec_open2(pCodecCtx,pCodec,NULL);
+    if(ret <0){
+        av_log(NULL,AV_LOG_ERROR,"can;t open video decoder");
+        return ;
+    }
+    int vWidth = pCodecCtx->width;
+    int vHeight = pCodecCtx->height;
+    ANativeWindow *nativeWindow = ANativeWindow_fromSurface(env,surface);
+    if(nativeWindow == NULL){
+        av_log(NULL,AV_LOG_ERROR,"can;t create native window");
+        return ;
+    }
+    ret = ANativeWindow_setBuffersGeometry(nativeWindow,vWidth,vHeight,WINDOW_FORMAT_RGBA_8888);
+    if(ret <0){
+        av_log(NULL,AV_LOG_ERROR,"can;t set native window buffer");
+        return ;
+    }
+    ANativeWindow_Buffer windowBuffer;
+    pPacket = av_packet_alloc();
+    pFrame = av_frame_alloc();
+    yuvFrame = av_frame_alloc();
+    int buffer_size = av_image_get_buffer_size(AV_PIX_FMT_RGBA,vWidth,vHeight,1);
+    uint8_t  *out_buffer = (uint8_t*) av_malloc(buffer_size*sizeof(uint8_t));
+    av_image_fill_arrays(yuvFrame->data,yuvFrame->linesize,out_buffer,AV_PIX_FMT_RGBA,vWidth,vHeight,1);
+
+    SwsContext *swsContext = sws_getContext(
+            vWidth,vHeight,pCodecCtx->pix_fmt,
+            vWidth,vHeight,AV_PIX_FMT_RGBA,
+            SWS_BICUBIC,NULL,NULL,NULL
+    );
+    while(av_read_frame(pFormatCtx,pPacket) >= 0){
+        if(pPacket->stream_index == video_index){
+            ret = avcodec_send_packet(pCodecCtx,pPacket);
+            if(ret<0 && ret != AVERROR(EAGAIN) &&ret != AVERROR_EOF){
+                av_log(NULL,AV_LOG_ERROR,"PLAYER ERROR");
+                break ;
+            }
+            ret = avcodec_receive_frame(pCodecCtx,pFrame);
+            if(ret == AVERROR(EAGAIN)){
+                av_log(NULL,AV_LOG_ERROR,"player error 2");
+                continue;
+            }
+            ret = sws_scale(swsContext,
+                            (const uint8_t* const*)pFrame->data,pFrame->linesize,
+                            0,vHeight,yuvFrame->data,yuvFrame->linesize);
+            if(ret<0){
+                av_log(NULL,AV_LOG_ERROR,"play error 3");
+                return ;
+            }
+            ret = ANativeWindow_lock(nativeWindow,&windowBuffer,NULL);
+            if(ret <0){
+                av_log(NULL,AV_LOG_ERROR,"player error 4");
+                return ;
+            }else{
+                uint8_t  *bit = (uint8_t *)windowBuffer.bits;
+                for(int h =0;h<vHeight;h++){
+                    memcpy(bit+h*windowBuffer.stride*4,
+                           out_buffer+h*yuvFrame->linesize[0],
+                           yuvFrame->linesize[0]);
+                }
+                ANativeWindow_unlockAndPost(nativeWindow);
+            }
+        }
+        av_packet_unref(pPacket);
+
+    }
+
+    sws_freeContext(swsContext);
+    av_free(out_buffer);
+    av_frame_free(&pFrame);
+    av_frame_free(&yuvFrame);
+    av_packet_free(&pPacket);
+    ANativeWindow_release(nativeWindow);
+    avcodec_close(pCodecCtx);
+    avformat_close_input(&pFormatCtx);
+
+    env->ReleaseStringUTFChars(path,filepath);
+
+    return;
+}extern "C"
+JNIEXPORT jlong JNICALL
+Java_com_example_ffmpegr4_activity_SurfaceViewActivity_getVideoDurattion(JNIEnv *env, jobject thiz,
+                                                                         jstring path) {
+    AVFormatContext *pFormatCtx;
+    pFormatCtx = avformat_alloc_context();
+    const char *filepath = env->GetStringUTFChars(path,0);
+    av_log(nullptr,AV_LOG_INFO,"filepath: %s",filepath);
+    avformat_open_input(&pFormatCtx, filepath,NULL, NULL);
+    return pFormatCtx->duration;
+}extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegr4_util_MusicPlay_playSound(JNIEnv *env, jobject instance, jstring input) {
+    av_log_set_callback(log_callback_test2);
+    AVFormatContext *pFormatCtx;
+    AVCodecContext *pCodecCtx;
+    AVPacket *pPacket;
+    AVCodec *pCodec;
+    AVFrame *pFrame,*yuvFrame;
+    int result ,audioindex;
+    av_log_set_level(AV_LOG_INFO);
+    av_log(nullptr,AV_LOG_INFO,"LOG: begin!");
+    pFormatCtx = avformat_alloc_context();
+    const char *filepath = env->GetStringUTFChars(input,0);
+    av_log(nullptr,AV_LOG_INFO,"filepath: %s",filepath);
+    result = avformat_open_input(&pFormatCtx, filepath,NULL, NULL);
+    if(result < 0){
+        av_log(NULL,AV_LOG_ERROR,"can;t open input");
+        return ;
+    }
+    //av_dump_format(pFormatCtx,0,filepath,0);
+    av_log(NULL,AV_LOG_INFO,"video duration: %" PRId64,pFormatCtx->duration);
+    result = avformat_find_stream_info(pFormatCtx,NULL);
+    if(result < 0) {
+        av_log(NULL, AV_LOG_ERROR, "can;t find stream info");
+        return;
+    }
+    audioindex = -1;
+    for(int i = 0;i<pFormatCtx->nb_streams; i++){
+        if(pFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+            audioindex = i;
+    }
+    if(audioindex == -1){
+        av_log(NULL,AV_LOG_ERROR,"can;t find video stream");
+        return ;
+    }
+    pCodecCtx = avcodec_alloc_context3(NULL);
+    avcodec_parameters_to_context(pCodecCtx,pFormatCtx->streams[audioindex]->codecpar);
+    pCodec = (AVCodec *)(avcodec_find_decoder(pCodecCtx->codec_id));
+    if(pCodec == NULL){
+        av_log(NULL,AV_LOG_ERROR,"can;t find decoder");
+        return ;
+    }
+    result = avcodec_open2(pCodecCtx,pCodec,NULL);
+    if(result <0){
+        av_log(NULL,AV_LOG_ERROR,"can;t open video decoder");
+        return ;
+    }
+    pPacket = av_packet_alloc();
+    pFrame = av_frame_alloc();
+    SwrContext *swrContext = swr_alloc();
+    uint8_t *out_buffer = (uint8_t *) av_malloc(44100 * 2);
+    uint64_t out_ch_layout = AV_CH_LAYOUT_STEREO;
+    enum AVSampleFormat out_format = AV_SAMPLE_FMT_S16;
+    int out_sample_rate = pCodecCtx->sample_rate;
+
+    swr_alloc_set_opts(swrContext,out_ch_layout,out_format,out_sample_rate,
+            pCodecCtx->channel_layout, pCodecCtx->sample_fmt, pCodecCtx->sample_rate,0,NULL);
+    swr_init(swrContext);
+
+    int out_channel_nb = av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO);
+    jclass david_player = env->GetObjectClass(instance);
+    jmethodID createAudio = env->GetMethodID(david_player,"createTrack","(II)V");
+    env->CallVoidMethod(instance, createAudio,44100, out_channel_nb);
+    jmethodID audio_write = env->GetMethodID(david_player,"playTrack","([BI)V");
+    while(av_read_frame(pFormatCtx,pPacket) >=0 ){
+        if(pPacket->stream_index == audioindex){
+            result = avcodec_send_packet(pCodecCtx,pPacket);
+            if(result<0 && result != AVERROR(EAGAIN) &&result != AVERROR_EOF){
+                av_log(NULL,AV_LOG_ERROR,"PLAYER ERROR");
+                break ;
+            }
+            result = avcodec_receive_frame(pCodecCtx,pFrame);
+            if(result == AVERROR(EAGAIN)){
+                av_log(NULL,AV_LOG_ERROR,"player error 2");
+                continue;
+            }
+            if(result <0){
+                av_log(NULL,AV_LOG_ERROR,"player error 4");
+                return ;
+            }else{
+               swr_convert(swrContext,&out_buffer,44100*2,
+                           (const uint8_t **)pFrame->data,pFrame->nb_samples);
+               int size = av_samples_get_buffer_size(NULL, out_channel_nb, pFrame->nb_samples,AV_SAMPLE_FMT_S16,1);
+               jbyteArray  audio_sample_array = env->NewByteArray(size);
+               env->SetByteArrayRegion(audio_sample_array,0,size,(const jbyte*) out_buffer);
+               env->CallVoidMethod(instance,audio_write,audio_sample_array,size);
+               env->DeleteLocalRef(audio_sample_array);
+                }
+
+            }    
+        }
+        swr_free(&swrContext);
+        av_free(out_buffer);
+        av_frame_free(&pFrame);
+        av_frame_free(&yuvFrame);
+        av_packet_free(&pPacket);
+        avcodec_close(pCodecCtx);
+        avformat_close_input(&pFormatCtx);
+
+        env->ReleaseStringUTFChars(input,filepath);
+    }
+
+

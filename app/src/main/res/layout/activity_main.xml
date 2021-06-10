@@ -49,5 +49,19 @@
         app:layout_constraintStart_toEndOf="@+id/btn_VideoView"
         app:layout_constraintTop_toTopOf="@+id/btn_VideoView"
         app:layout_constraintVertical_bias="1.0" />
+
+    <Button
+        android:id="@+id/btn_music"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="188dp"
+        android:layout_marginLeft="188dp"
+        android:layout_marginTop="24dp"
+        android:text="MUSIC"
+        app:layout_constraintBottom_toBottomOf="@+id/btn_VideoView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/btn_VideoView"
+        app:layout_constraintTop_toTopOf="@+id/btn_VideoView"
+        app:layout_constraintVertical_bias="1.0" />
     ;
 </androidx.constraintlayout.widget.ConstraintLayout>

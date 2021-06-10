@@ -34,10 +34,19 @@
         android:id="@+id/btn_choose"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="64dp"
         android:text="choose"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/surface_view" />
+
+    <TextView
+        android:id="@+id/text_video_progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 %"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/seekbar" />
 
     <Button
         android:id="@+id/btn_play"
@@ -45,10 +54,10 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="172dp"
         android:layout_marginLeft="172dp"
-        android:layout_marginTop="20dp"
         android:text="play"
+        app:layout_constraintBottom_toBottomOf="@+id/btn_choose"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/surface_view" />
+        app:layout_constraintTop_toTopOf="@+id/btn_choose" />
 
     <TextView
         android:id="@+id/text_duration"
@@ -58,4 +67,12 @@
         android:text="Duration： "
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/btn_choose" />
+
+    <SeekBar
+        android:id="@+id/seekbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/surface_view" />
 </androidx.constraintlayout.widget.ConstraintLayout>

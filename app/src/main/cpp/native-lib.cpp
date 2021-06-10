@@ -135,13 +135,13 @@ Java_com_example_ffmpegr4_activity_TransActivity_transVideo(JNIEnv *env, jobject
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_ffmpegr4_activity_SurfaceViewActivity_playVideo(JNIEnv *env, jobject thiz,
-                                                                 jstring path, jobject surface) {
+                                                                 jstring path, jobject surface,jobject seekbar) {
     av_log_set_callback(log_callback_test2);
     AVFormatContext *pFormatCtx;
     AVCodecContext *pCodecCtx;
     AVPacket *pPacket;
     AVCodec *pCodec;
-    AVFrame *pFrame,*yuvFrame;
+    AVFrame *pFrame,*rgbaFrame;
     int ret ,video_index;
     av_log_set_level(AV_LOG_INFO);
     av_log(nullptr,AV_LOG_INFO,"LOG: begin!");
@@ -196,48 +196,72 @@ Java_com_example_ffmpegr4_activity_SurfaceViewActivity_playVideo(JNIEnv *env, jo
     ANativeWindow_Buffer windowBuffer;
     pPacket = av_packet_alloc();
     pFrame = av_frame_alloc();
-    yuvFrame = av_frame_alloc();
+    rgbaFrame = av_frame_alloc();
     int buffer_size = av_image_get_buffer_size(AV_PIX_FMT_RGBA,vWidth,vHeight,1);
     uint8_t  *out_buffer = (uint8_t*) av_malloc(buffer_size*sizeof(uint8_t));
-    av_image_fill_arrays(yuvFrame->data,yuvFrame->linesize,out_buffer,AV_PIX_FMT_RGBA,vWidth,vHeight,1);
+    av_image_fill_arrays(rgbaFrame->data,rgbaFrame->linesize,out_buffer,AV_PIX_FMT_RGBA,vWidth,vHeight,1);
 
-    SwsContext *swsContext = sws_getContext(
+    struct SwsContext *swsContext = sws_getContext(
             vWidth,vHeight,pCodecCtx->pix_fmt,
             vWidth,vHeight,AV_PIX_FMT_RGBA,
             SWS_BICUBIC,NULL,NULL,NULL
     );
+    int isLog = -1;
+    int frames = 30;
+    jclass seakbar = env->GetObjectClass(seekbar);
+    jmethodID set_seekbar_progress = env->GetMethodID(seakbar, "setProgress", "(I)V");
     while(av_read_frame(pFormatCtx,pPacket) >= 0){
         if(pPacket->stream_index == video_index){
             ret = avcodec_send_packet(pCodecCtx,pPacket);
+            /// TOOD ：输出帧数
+            if(isLog == -1) {
+                frames = pFormatCtx->streams[video_index]->avg_frame_rate.num /
+                             pFormatCtx->streams[video_index]->avg_frame_rate.den;
+                av_log(NULL, AV_LOG_INFO, "frames : %d", frames);
+                av_log(NULL, AV_LOG_INFO, "timebase : %f", av_q2d(pCodecCtx->time_base));
+                isLog = 1;
+            }
+            ///
             if(ret<0 && ret != AVERROR(EAGAIN) &&ret != AVERROR_EOF){
                 av_log(NULL,AV_LOG_ERROR,"PLAYER ERROR");
                 break ;
             }
-            ret = avcodec_receive_frame(pCodecCtx,pFrame);
-            if(ret == AVERROR(EAGAIN)){
+            while(avcodec_receive_frame(pCodecCtx,pFrame)==0){
+                ret = ANativeWindow_lock(nativeWindow,&windowBuffer,NULL);
+                if(ret<0){
+                    av_log(NULL,AV_LOG_ERROR,"play error 3");
+                    return ;
+                }
+                ret = sws_scale(swsContext,
+                                  (const uint8_t* const*)pFrame->data,pFrame->linesize,
+                                  0,vHeight,rgbaFrame->data,rgbaFrame->linesize);
+                if(ret <0){
+                    av_log(NULL,AV_LOG_ERROR,"player error 4");
+                    return ;
+                }
+                uint8_t  *bit = static_cast<uint8_t *>(windowBuffer.bits);
+                for(int h =0;h<vHeight;h++){
+                    memcpy(bit+h*windowBuffer.stride*4,
+                           rgbaFrame->data[0]+h*rgbaFrame->linesize[0],
+                           (size_t)rgbaFrame->linesize[0]);
+                }
+                ANativeWindow_unlockAndPost(nativeWindow);
+                //获取当前时间
+                double cur_time = (pFrame->best_effort_timestamp*av_q2d(pFormatCtx->streams[video_index]->time_base) *1.0) / (pFormatCtx->duration / 100000000.0 );
+                av_log(NULL,AV_LOG_INFO,"cur time %f",cur_time);
+                env->CallVoidMethod(seekbar,set_seekbar_progress,(int)(cur_time));
+                usleep((unsigned long) 1000000/frames/2);
+            }
+            /*if(ret == AVERROR(EAGAIN)){
                 av_log(NULL,AV_LOG_ERROR,"player error 2");
                 continue;
-            }
-            ret = sws_scale(swsContext,
-                            (const uint8_t* const*)pFrame->data,pFrame->linesize,
-                            0,vHeight,yuvFrame->data,yuvFrame->linesize);
+            }*/
+         /*   ret = ANativeWindow_lock(nativeWindow,&windowBuffer,NULL);
             if(ret<0){
                 av_log(NULL,AV_LOG_ERROR,"play error 3");
                 return ;
-            }
-            ret = ANativeWindow_lock(nativeWindow,&windowBuffer,NULL);
-            if(ret <0){
-                av_log(NULL,AV_LOG_ERROR,"player error 4");
-                return ;
-            }else{
-                uint8_t  *bit = (uint8_t *)windowBuffer.bits;
-                for(int h =0;h<vHeight;h++){
-                    memcpy(bit+h*windowBuffer.stride*4,
-                           out_buffer+h*yuvFrame->linesize[0],
-                           yuvFrame->linesize[0]);
-                }
-                ANativeWindow_unlockAndPost(nativeWindow);
-            }
+            }*/
+
         }
         av_packet_unref(pPacket);
 
@@ -246,12 +270,11 @@ Java_com_example_ffmpegr4_activity_SurfaceViewActivity_playVideo(JNIEnv *env, jo
     sws_freeContext(swsContext);
     av_free(out_buffer);
     av_frame_free(&pFrame);
-    av_frame_free(&yuvFrame);
+    av_frame_free(&rgbaFrame);
     av_packet_free(&pPacket);
     ANativeWindow_release(nativeWindow);
     avcodec_close(pCodecCtx);
     avformat_close_input(&pFormatCtx);
-
     env->ReleaseStringUTFChars(path,filepath);
 
     return;

@@ -31,6 +31,18 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
+        android:id="@+id/btn_Pause"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="40dp"
+        android:layout_marginLeft="40dp"
+        android:text="pause"
+        app:layout_constraintBottom_toTopOf="@+id/text_duration"
+        app:layout_constraintStart_toEndOf="@+id/btn_play"
+        app:layout_constraintTop_toTopOf="@+id/btn_choose"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <Button
         android:id="@+id/btn_choose"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -52,12 +64,13 @@
         android:id="@+id/btn_play"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="172dp"
-        android:layout_marginLeft="172dp"
+        android:layout_marginStart="160dp"
+        android:layout_marginLeft="160dp"
         android:text="play"
         app:layout_constraintBottom_toBottomOf="@+id/btn_choose"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/btn_choose" />
+        app:layout_constraintTop_toTopOf="@+id/btn_choose"
+        app:layout_constraintVertical_bias="0.0" />
 
     <TextView
         android:id="@+id/text_duration"

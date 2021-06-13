@@ -28,7 +28,7 @@ public class AudioActivity extends AppCompatActivity {
                     @Override
                     public void run() {
                         Logger.D("RUN");
-                        musicPlay.playSound("/sdcard/ig.mp4");
+                        musicPlay.playSound("/storage/emulated/0/douyin2.mp4");
                         Logger.D("END");
                     }
                 };
